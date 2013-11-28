@@ -24,38 +24,71 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <iostream>
+#ifndef __CXXFW_ARRAY_H__
+#define __CXXFW_ARRAY_H__
 
-#include "array.h"
-#include "dictionary.h"
+#include <functional>
+#include <stdexcept>
 
-using namespace CxxFW;
+namespace CxxFW {
 
-int
-main()
+template <typename T> class Array {
+public:
+	Array(): _data(nullptr) {}
+	~Array();
+	T& operator [](size_t idx);
+	void enumerate(
+	    std::function<void (size_t idx, const T &obj, bool &stop)> func);
+	void append(const T &obj);
+
+protected:
+	T *_data;
+	size_t _count, _mutations;
+};
+
+template <typename T> Array<T>::~Array()
 {
-	Dictionary<const char*, std::string> dict;
-	dict["foo"] = "bar";
-	dict["qux"] = "lol";
+	for (size_t i = 0; i < _count; i++)
+		_data[i].~T();
 
-	std::cout << dict["foo"] << std::endl;
-	std::cout << dict["qux"] << std::endl;
-
-	dict.enumerate([] (const char *const &key, const std::string &value,
-	  bool &stop) {
-		std::cout << key << " = " << value << std::endl;
-	});
-
-	Array<std::string> array;
-	array.append("foo");
-	array.append("bar");
-	array.append("baz");
-
-	std::cout << array[0] << array[1] << array[2] << std::endl;
-
-	array.enumerate([] (size_t idx, const std::string &obj, bool &stop) {
-		std::cout << obj << std::endl;
-	});
-
-	return 0;
+	free(_data);
 }
+
+template <typename T> T&
+Array<T>::operator [](size_t idx)
+{
+	if (idx >= _count)
+		throw std::range_error("Index out of range");
+
+	return _data[idx];
+}
+
+template <typename T> void
+Array<T>::enumerate(
+    std::function<void (size_t idx, const T &obj, bool &stop)> func)
+{
+	bool stop = false;
+
+	for (size_t i = 0; i < _count && !stop; i++)
+		func(i, _data[i], stop);
+}
+
+template <typename T> void
+Array<T>::append(const T &obj)
+{
+	if (SIZE_MAX - _count < 1 || SIZE_MAX / sizeof(T) < _count + 1)
+		throw std::overflow_error("Integer overflow");
+
+	T *data = (T*)realloc(_data, (_count + 1) * sizeof(T));
+	if (data == nullptr)
+		throw std::bad_alloc();
+
+	new(&data[_count]) T(obj);
+
+	_data = data;
+	_count++;
+}
+
+}
+
+#endif
