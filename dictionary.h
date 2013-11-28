@@ -42,27 +42,31 @@ namespace CxxFW {
 template <typename K, typename V> class Dictionary {
 protected:
 	static const size_t MIN_CAPACITY = 16;
+
 	struct Bucket {
+		Bucket(Hash hash, K key): hash(hash), key(key) {}
+
 		Hash hash;
 		K key;
 		V value;
 	};
-
-	size_t _count, _capacity, _mutations;
-	Bucket **_buckets;
-
-	void resizeForCount(size_t count);
 
 public:
 	Dictionary(size_t capacity = 0);
 	~Dictionary(void);
 	V& operator [](const K &key);
 	size_t count(void);
-	bool hasKey(const V &key);
+	bool has_key(const V &key);
 	bool contains(const V &value);
 	void remove(const K &key);
 	void enumerate(std::function<void(const K &key, const V &value,
 	    bool &stop)> func);
+
+protected:
+	void resizeForCount(size_t count);
+
+	size_t _count, _capacity, _mutations;
+	Bucket **_buckets;
 };
 
 template <typename K, typename V> Dictionary<K, V>::Dictionary(size_t capacity):
@@ -70,7 +74,7 @@ template <typename K, typename V> Dictionary<K, V>::Dictionary(size_t capacity):
 {
 	if (capacity > HASH_MAX / sizeof(*_buckets) ||
 	    capacity > HASH_MAX / 8)
-		throw std::out_of_range("Integer overflow");
+		throw std::overflow_error("Integer overflow");
 
 	/* FIXME: Check that * 2 does not overflow! */
 	for (_capacity = 1; _capacity < capacity; _capacity *= 2);
@@ -138,13 +142,9 @@ Dictionary<K, V>::operator [](const K &key)
 	}
 
 	if (i >= last)
-		throw std::out_of_range("Dictionary full");
+		throw std::overflow_error("Dictionary full");
 
-	Bucket *bucket = new Bucket();
-	bucket->hash = keyHash;
-	bucket->key = key;
-
-	_buckets[i] = bucket;
+	_buckets[i] = new Bucket(keyHash, key);
 	_count++;
 
 	return _buckets[i]->value;
@@ -157,7 +157,7 @@ Dictionary<K, V>::count(void)
 }
 
 template <typename K, typename V> bool
-Dictionary<K, V>::hasKey(const V &key)
+Dictionary<K, V>::has_key(const V &key)
 {
 	if (_count == 0)
 		return false;
@@ -255,7 +255,7 @@ Dictionary<K, V>::resizeForCount(size_t count)
 
 	if (count > HASH_MAX || count > HASH_MAX / sizeof(*_buckets) ||
 	    count > HASH_MAX / 8)
-		throw std::out_of_range("Integer overflow");
+		throw std::overflow_error("Integer overflow");
 
 	size_t fullness = count * 8 / _capacity;
 
